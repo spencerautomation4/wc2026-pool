@@ -148,7 +148,6 @@ const DRAFT_TIERS = {
 };
 
 
-DRAFT_TIERS[3] = ["Japan","Norway","United States","Uruguay"];
 
 const DRAFT_ORDER = [12,11,10,9,8,7,6,5,4,3,2,1];
 const OWNERS = ["Scott","Spencer","Grant","Andrew"];
