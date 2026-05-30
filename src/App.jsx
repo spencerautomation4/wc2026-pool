@@ -153,6 +153,21 @@ DRAFT_TIERS[3] = ["Japan","Norway","United States","Uruguay"];
 const DRAFT_ORDER = [12,11,10,9,8,7,6,5,4,3,2,1];
 const OWNERS = ["Scott","Spencer","Grant","Andrew"];
 const OWNER_COLORS = ["#2563EB","#16A34A","#D97706","#DC2626"];
+const OWNER_NAMES_DISPLAY = ["Scott","Spencer","Grant","Andrew"];
+// FIFA gold accent for tier list
+const GOLD = "#B8860B";
+const GOLD_LIGHT = "#FDF3C0";
+const GOLD_BORDER = "#E6C84A";
+
+// Build team→owner map from draft assignments (called with draftState.assignments)
+function buildTeamOwnerMap(assignments) {
+  if(!assignments) return {};
+  const map = {};
+  OWNERS.forEach((owner, oi) => {
+    (assignments[owner] || []).forEach(({team}) => { map[team] = oi; });
+  });
+  return map;
+}
 const DOUBLE_PT_TIERS = new Set([9,10,11,12]);
 
 // ─── SCORING ENGINE ──────────────────────────────────────────────────────────
@@ -383,7 +398,7 @@ export default function App() {
         .team-row-expand{animation:slideIn .2s ease forwards;}
       `}</style>
 
-      <div style={{background:"#E8002D",padding:"10px 16px",display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{background:"#E8002D",padding:"10px 16px",display:"flex",flexDirection:"column",gap:10,position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,color:"#fff",fontWeight:700,letterSpacing:".06em",whiteSpace:"nowrap"}}>FIFA WORLD CUP 2026</span>
           <span style={{background:"rgba(255,255,255,.2)",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:4,letterSpacing:".1em",whiteSpace:"nowrap"}}>POOL TRACKER</span>
@@ -400,7 +415,7 @@ export default function App() {
       </div>
 
       <TabBoundary key={tab}>
-        {tab==="groups" && <GroupsTab allSt={allSt} gScores={gScores} setGroupScore={setGroupScore} thirds={thirds}/>}
+        {tab==="groups" && <GroupsTab allSt={allSt} gScores={gScores} setGroupScore={setGroupScore} thirds={thirds} draftState={draftState}/>}
         {tab==="bracket" && <BracketTab bracketTeams={bracketTeams} kRes={kRes} setKnockout={setKnockout}/>}
         {tab==="draft" && <DraftTab draftState={draftState} setDraftState={setDraftState} saveDraft={saveDraft} setTab={setTab}/>}
         {tab==="leaderboard" && <LeaderboardTab draftState={draftState} allSt={allSt} thirds={thirds} top8groups={top8groups} gScores={gScores}/>}
@@ -410,19 +425,78 @@ export default function App() {
 }
 
 // ─── GROUP STAGE ─────────────────────────────────────────────────────────────
-function GroupsTab({allSt,gScores,setGroupScore,thirds}){
-  const qualSet=new Set(thirds.slice(0,8).map(t=>t.name));
+function GroupsTab({allSt,gScores,setGroupScore,thirds,draftState}){
+  const [search, setSearch] = useState("");
+  const groupRefs = useRef({});
+  const qualSet = new Set(thirds.slice(0,8).map(t=>t.name));
+  const teamOwnerMap = useMemo(()=>buildTeamOwnerMap(draftState?.assignments),[draftState]);
+  const draftDone = draftState?.phase === "done" && Object.keys(teamOwnerMap).length > 0;
+
+  // Find which groups match the search term
+  const searchTerm = search.trim().toLowerCase();
+  const matchedGroups = searchTerm
+    ? GROUP_IDS.filter(g => GROUPS[g].some(t => t.toLowerCase().includes(searchTerm)))
+    : [];
+
+  // Auto-scroll to first matched group
+  useEffect(()=>{
+    if(matchedGroups.length > 0 && groupRefs.current[matchedGroups[0]]){
+      groupRefs.current[matchedGroups[0]].scrollIntoView({behavior:"smooth", block:"start"});
+    }
+  }, [searchTerm]);
+
   return(
-    <div style={{padding:"20px 24px"}}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(360px,1fr))",gap:16}}>
-        {GROUP_IDS.map(g=><GroupCard key={g} gid={g} st={allSt[g]} gScores={gScores} setGroupScore={setGroupScore} qualSet={qualSet}/>)}
+    <div style={{padding:"12px 16px"}}>
+      {/* Owner key — only shown after draft is done */}
+      {draftDone && (
+        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:12,padding:"8px 12px",background:"#fff",border:"1.5px solid #E2E8F0",borderRadius:8}}>
+          <span style={{fontSize:11,fontWeight:600,color:"#8896A4",letterSpacing:".04em",textTransform:"uppercase",flexShrink:0}}>Owners:</span>
+          {OWNERS.map((owner,oi)=>(
+            <div key={owner} style={{display:"flex",alignItems:"center",gap:5}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:OWNER_COLORS[oi],flexShrink:0}}/>
+              <span style={{fontSize:12,fontWeight:500,color:"#1A1A2E"}}>{owner}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Search bar */}
+      <div style={{position:"relative",marginBottom:14}}>
+        <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"#8896A4",pointerEvents:"none"}}>🔍</span>
+        <input
+          type="text"
+          placeholder="Search team to jump to group…"
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+          style={{width:"100%",padding:"8px 10px 8px 32px",border:"1.5px solid #E2E8F0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",color:"#1A1A2E",background:"#fff"}}
+          onFocus={e=>e.target.style.borderColor="#E8002D"}
+          onBlur={e=>e.target.style.borderColor="#E2E8F0"}
+        />
+        {search && (
+          <button onClick={()=>setSearch("")}
+            style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#8896A4",fontSize:16,lineHeight:1}}>×</button>
+        )}
+        {searchTerm && matchedGroups.length===0 && (
+          <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:"#fff",border:"1.5px solid #E2E8F0",borderRadius:6,padding:"8px 12px",fontSize:12,color:"#8896A4",zIndex:10}}>
+            No teams found matching "{search}"
+          </div>
+        )}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:16}}>
+        {GROUP_IDS.map(g=>(
+          <div key={g} ref={el=>groupRefs.current[g]=el}
+            style={{transition:"box-shadow .2s", ...(matchedGroups.includes(g) && searchTerm ? {boxShadow:"0 0 0 3px #E8002D"} : {})}}>
+            <GroupCard gid={g} st={allSt[g]} gScores={gScores} setGroupScore={setGroupScore} qualSet={qualSet}
+              teamOwnerMap={teamOwnerMap} draftDone={draftDone}
+              highlighted={matchedGroups.includes(g) && !!searchTerm} searchTerm={searchTerm}/>
+          </div>
+        ))}
       </div>
       <ThirdsPanel thirds={thirds}/>
     </div>
   );
 }
 
-function GroupCard({gid,st,gScores,setGroupScore,qualSet}){
+function GroupCard({gid,st,gScores,setGroupScore,qualSet,teamOwnerMap,draftDone,highlighted,searchTerm}){
   const teams=GROUPS[gid];
   const infos=MATCH_INFO[gid];
   return(
@@ -442,13 +516,23 @@ function GroupCard({gid,st,gScores,setGroupScore,qualSet}){
             <div key={mi} style={{marginBottom:mi<5?10:0}}>
               <div style={{fontSize:11,color:"#8896A4",marginBottom:4,fontWeight:500}}>{info?info[1]:""}</div>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{flex:1,fontSize:13,fontWeight:600,textAlign:"right",color:homeWon?"#1A1A2E":awayWon?"#8896A4":"#1A1A2E",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{teams[hi]}</span>
+                <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"flex-end",gap:4,minWidth:0}}>
+                  {draftDone && teamOwnerMap[teams[hi]]!==undefined && (
+                    <div style={{width:7,height:7,borderRadius:"50%",background:OWNER_COLORS[teamOwnerMap[teams[hi]]],flexShrink:0}}/>
+                  )}
+                  <span style={{fontSize:13,fontWeight:600,color:homeWon?"#1A1A2E":awayWon?"#8896A4":"#1A1A2E",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{teams[hi]}</span>
+                </div>
                 <div style={{display:"flex",alignItems:"center",gap:4}}>
                   <input className="score-inp" placeholder="—" value={sc.h??""} onChange={e=>setGroupScore(gid,mi,"h",e.target.value)}/>
                   <span style={{color:"#CBD5E0",fontSize:13,fontWeight:600,userSelect:"none"}}>–</span>
                   <input className="score-inp" placeholder="—" value={sc.a??""} onChange={e=>setGroupScore(gid,mi,"a",e.target.value)}/>
                 </div>
-                <span style={{flex:1,fontSize:13,fontWeight:600,color:awayWon?"#1A1A2E":homeWon?"#8896A4":"#1A1A2E",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{teams[ai]}</span>
+                <div style={{flex:1,display:"flex",alignItems:"center",gap:4,minWidth:0}}>
+                  <span style={{fontSize:13,fontWeight:600,color:awayWon?"#1A1A2E":homeWon?"#8896A4":"#1A1A2E",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{teams[ai]}</span>
+                  {draftDone && teamOwnerMap[teams[ai]]!==undefined && (
+                    <div style={{width:7,height:7,borderRadius:"50%",background:OWNER_COLORS[teamOwnerMap[teams[ai]]],flexShrink:0}}/>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -476,7 +560,14 @@ function GroupCard({gid,st,gScores,setGroupScore,qualSet}){
               return(
                 <tr key={t.name} className="st-row" style={{borderLeft:`3px solid ${lbc}`}}>
                   <td style={{padding:"5px 0 5px 6px",color:isFirst?"#E8002D":isSecond?"#4A5568":"#8896A4",fontWeight:700,fontSize:11}}>{i+1}</td>
-                  <td style={{padding:"5px 0",color:i<2?"#1A1A2E":isThird?"#2D3748":"#8896A4",fontWeight:i<2?600:400,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</td>
+                  <td style={{padding:"5px 0"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      {draftDone && teamOwnerMap[t.name]!==undefined && (
+                        <div style={{width:7,height:7,borderRadius:"50%",background:OWNER_COLORS[teamOwnerMap[t.name]],flexShrink:0}}/>
+                      )}
+                      <span style={{color:i<2?"#1A1A2E":isThird?"#2D3748":"#8896A4",fontWeight:i<2?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span>
+                    </div>
+                  </td>
                   <td style={{textAlign:"center",padding:"5px 0",color:"#4A5568"}}>{t.pld}</td>
                   <td style={{textAlign:"center",padding:"5px 0",color:"#4A5568"}}>{t.w}</td>
                   <td style={{textAlign:"center",padding:"5px 0",color:"#4A5568"}}>{t.d}</td>
@@ -618,13 +709,13 @@ function DraftTab({draftState, setDraftState, saveDraft, setTab}) {
     setShuffleTeams([...tierTeams]);
 
     let tick = 0;
-    const totalFast = 18, totalSlow = 8, total = totalFast + totalSlow;
+    const totalFast = 10, totalSlow = 5, total = totalFast + totalSlow;
 
     function doTick(){
       tick++;
       setShuffleTeams([...tierTeams].sort(()=>Math.random()-.5));
       if(tick < total){
-        const delay = tick <= totalFast ? 100 : 240;
+        const delay = tick <= totalFast ? 80 : 200;
         shuffleTimerRef.current = setTimeout(doTick, delay);
       } else {
         // Shuffle done — build the assignment result
@@ -738,18 +829,18 @@ function DraftTab({draftState, setDraftState, saveDraft, setTab}) {
           const ownerTeams = ds.assignments[owner]||[];
           return(
             <div key={owner} className="card">
-              <div style={{padding:"8px 14px",borderBottom:"1.5px solid #E2E8F0",display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:10,height:10,borderRadius:"50%",background:OWNER_COLORS[oi],flexShrink:0}}/>
-                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,letterSpacing:".06em",color:OWNER_COLORS[oi]}}>{owner.toUpperCase()}</span>
-                <span style={{marginLeft:"auto",fontSize:11,color:"#8896A4"}}>{ownerTeams.length}/12</span>
+              <div style={{padding:"8px 10px",borderBottom:"1.5px solid #E2E8F0",display:"flex",alignItems:"center",gap:6,minWidth:0}}>
+                <div style={{width:9,height:9,borderRadius:"50%",background:OWNER_COLORS[oi],flexShrink:0}}/>
+                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,letterSpacing:".04em",color:OWNER_COLORS[oi],overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0}}>{owner.toUpperCase()}</span>
+                <span style={{fontSize:10,color:"#8896A4",flexShrink:0}}>{ownerTeams.length}/12</span>
               </div>
               <div style={{padding:"8px 10px",minHeight:60}}>
                 {ownerTeams.length===0
                   ? <span style={{fontSize:11,color:"#CBD5E0",fontStyle:"italic"}}>No teams yet</span>
                   : ownerTeams.map(({team,tier})=>(
-                    <div key={team} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 6px",marginBottom:2,borderRadius:5,background:"#F7F8FA",border:"1px solid #E2E8F0"}}>
-                      <span style={{fontSize:12,fontWeight:500,color:"#1A1A2E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{team}</span>
-                      <span style={{fontSize:10,color:"#8896A4",marginLeft:6,flexShrink:0}}>T{tier}</span>
+                    <div key={team} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 5px",marginBottom:2,borderRadius:5,background:"#F7F8FA",border:"1px solid #E2E8F0",minWidth:0}}>
+                      <span style={{fontSize:11,fontWeight:500,color:"#1A1A2E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0}}>{team}</span>
+                      <span style={{fontSize:9,color:"#8896A4",marginLeft:4,flexShrink:0}}>T{tier}</span>
                     </div>
                   ))
                 }
@@ -843,14 +934,7 @@ function DraftTab({draftState, setDraftState, saveDraft, setTab}) {
           {DRAFT_ORDER.map(tierNum => {
             const teams = DRAFT_TIERS[tierNum] || [];
             const isDouble = DOUBLE_PT_TIERS.has(tierNum);
-            const tierColors = {
-              1:"#2F855A", 2:"#2F855A",
-              3:"#276749", 4:"#276749",
-              5:"#B7791F", 6:"#B7791F",
-              7:"#4A5568", 8:"#4A5568",
-              9:"#C05621", 10:"#C05621",
-              11:"#9B2C2C", 12:"#9B2C2C",
-            };
+            // Use single gold accent for all tiers
             const TIER_ODDS = {
               12: {"Curaçao":"+250000", "Haiti":"+250000", "South Africa":"+100000", "Uzbekistan":"+100000"},
               11: {"New Zealand":"+100000", "Panama":"+100000", "Qatar":"+100000", "Saudi Arabia":"+100000"},
@@ -865,18 +949,18 @@ function DraftTab({draftState, setDraftState, saveDraft, setTab}) {
               2: {"Brazil":"+800", "Germany":"+1400", "Netherlands":"+2000", "Portugal":"+1000"},
               1: {"Argentina":"+800", "England":"+650", "France":"+450", "Spain":"+500"},
             };
-            const color = tierColors[tierNum] || "#4A5568";
+            const color = GOLD;
             return (
               <div key={tierNum} style={{marginBottom:12}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                  <div style={{background:color,color:"#fff",fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:13,padding:"1px 8px",borderRadius:4,letterSpacing:".06em"}}>TIER {tierNum}</div>
+                  <div style={{background:GOLD_LIGHT,color:GOLD,border:`1px solid ${GOLD_BORDER}`,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:13,padding:"1px 8px",borderRadius:4,letterSpacing:".06em"}}>TIER {tierNum}</div>
                   {isDouble && <span style={{fontSize:10,fontWeight:700,background:"#FFFBEB",color:"#92400E",border:"1px solid #FDE68A",borderRadius:4,padding:"1px 6px"}}>×2 POINTS</span>}
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:5}}>
                   {[...teams].sort().map(team => (
                     <div key={team} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 8px",borderRadius:5,background:"#F7F8FA",border:"1px solid #E2E8F0"}}>
                       <span style={{fontSize:12,fontWeight:500,color:"#1A1A2E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{team}</span>
-                      <span style={{fontSize:11,fontWeight:600,color:color,marginLeft:8,flexShrink:0}}>{(TIER_ODDS[tierNum]||{})[team] || "—"}</span>
+                      <span style={{fontSize:11,fontWeight:600,color:GOLD,marginLeft:8,flexShrink:0}}>{(TIER_ODDS[tierNum]||{})[team] || "—"}</span>
                     </div>
                   ))}
                 </div>
@@ -914,7 +998,19 @@ function LeaderboardTab({draftState, allSt, thirds, top8groups, gScores}) {
 
   return(
     <div style={{padding:"14px 12px",maxWidth:820}}>
-      <div style={{fontSize:12,color:"#8896A4",marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
+      {/* Scoring rules — at the top for quick reference */}
+      <div style={{padding:"10px 14px",background:"#fff",border:"1.5px solid #E2E8F0",borderRadius:10,marginBottom:12}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:700,color:"#1A1A2E",letterSpacing:".06em",marginBottom:6}}>SCORING RULES</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:"4px 16px",fontSize:12,color:"#4A5568"}}>
+          <span>⚽ 1pt/goal</span>
+          <span>📋 1pt/group stage point</span>
+          <span>🥇 +3 group winner</span>
+          <span>🥈 +2 runner-up</span>
+          <span>🌟 +1 best 3rd</span>
+          <span style={{color:"#92400E",fontWeight:600}}>×2 tiers 9–12</span>
+        </div>
+      </div>
+      <div style={{fontSize:12,color:"#8896A4",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
         <span style={{width:8,height:8,borderRadius:"50%",background:"#2F855A",display:"inline-block",flexShrink:0}}/>
         Live — updates in real time as group stage scores are entered
       </div>
@@ -983,18 +1079,6 @@ function LeaderboardTab({draftState, allSt, thirds, top8groups, gScores}) {
         })}
       </div>
 
-      {/* Scoring key */}
-      <div style={{marginTop:20,padding:"12px 16px",background:"#fff",border:"1.5px solid #E2E8F0",borderRadius:10}}>
-        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:700,color:"#1A1A2E",letterSpacing:".06em",marginBottom:8}}>SCORING RULES</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:6,fontSize:12,color:"#4A5568"}}>
-          <div>⚽ 1 pt per goal scored</div>
-          <div>📋 1 pt per group stage point (W=3, D=1)</div>
-          <div>🥇 3 pts for winning the group</div>
-          <div>🥈 2 pts for finishing 2nd</div>
-          <div>🌟 1 pt for best 3rd (advancing)</div>
-          <div style={{color:"#92400E",fontWeight:600}}>×2 double points for tiers 9–12 (longest shots)</div>
-        </div>
-      </div>
     </div>
   );
 }
