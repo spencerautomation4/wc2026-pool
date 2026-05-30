@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { DRAFT_TIERS, DOUBLE_PT_TIERS, DRAFT_ORDER, TIER_ODDS } from "./tiers.js";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set, get } from "firebase/database";
 
@@ -132,24 +133,10 @@ const MATCH_SCHEDULE = {
   104:"Jul 19 · 3:00 PM · New York/NJ",
 };
 
-const DRAFT_TIERS = {
-  12:["Curaçao","Haiti","South Africa","Uzbekistan"],
-  11:["New Zealand","Panama","Qatar","Saudi Arabia"],
-  10:["Cape Verde","DR Congo","Iraq","Jordan"],
-  9:["Australia","Iran","South Korea","Tunisia"],
-  8:["Bosnia and Herzegovina","Egypt","Ghana","Scotland"],
-  7:["Algeria","Czech Republic","Ivory Coast","Paraguay"],
-  6:["Austria","Canada","Switzerland","Turkey"],
-  5:["Ecuador","Mexico","Senegal","Sweden"],
-  4:["Croatia","Japan","United States","Uruguay"],
-  3:["Belgium","Colombia","Morocco","Norway"],
-  2:["Brazil","Germany","Netherlands","Portugal"],
-  1:["Argentina","England","France","Spain"],
-};
 
 
 
-const DRAFT_ORDER = [12,11,10,9,8,7,6,5,4,3,2,1];
+
 const OWNERS = ["Scott","Spencer","Grant","Andrew"];
 const OWNER_COLORS = ["#2563EB","#16A34A","#D97706","#DC2626"];
 const OWNER_NAMES_DISPLAY = ["Scott","Spencer","Grant","Andrew"];
@@ -167,7 +154,6 @@ function buildTeamOwnerMap(assignments) {
   });
   return map;
 }
-const DOUBLE_PT_TIERS = new Set([9,10,11,12]);
 
 // ─── SCORING ENGINE ──────────────────────────────────────────────────────────
 // Returns {total, base, multiplier, breakdown:{goals,groupPts,position,positionLabel}}
@@ -934,20 +920,7 @@ function DraftTab({draftState, setDraftState, saveDraft, setTab}) {
             const teams = DRAFT_TIERS[tierNum] || [];
             const isDouble = DOUBLE_PT_TIERS.has(tierNum);
             // Use single gold accent for all tiers
-            const TIER_ODDS = {
-              12: {"Curaçao":"+250000", "Haiti":"+250000", "South Africa":"+100000", "Uzbekistan":"+100000"},
-              11: {"New Zealand":"+100000", "Panama":"+100000", "Qatar":"+100000", "Saudi Arabia":"+100000"},
-              10: {"Cape Verde":"+100000", "DR Congo":"+75000", "Iraq":"+100000", "Jordan":"+100000"},
-              9: {"Australia":"+50000", "Iran":"+50000", "South Korea":"+25000", "Tunisia":"+50000"},
-              8: {"Bosnia and Herzegovina":"+25000", "Egypt":"+25000", "Ghana":"+25000", "Scotland":"+25000"},
-              7: {"Algeria":"+25000", "Czech Republic":"+20000", "Ivory Coast":"+20000", "Paraguay":"+15000"},
-              6: {"Austria":"+10000", "Canada":"+15000", "Switzerland":"+6600", "Turkey":"+6600"},
-              5: {"Ecuador":"+6600", "Mexico":"+6600", "Senegal":"+6600", "Sweden":"+6600"},
-              4: {"Croatia":"+6600", "Japan":"+5000", "United States":"+4000", "Uruguay":"+5000"},
-              3: {"Belgium":"+3300", "Colombia":"+4000", "Morocco":"+4000", "Norway":"+2500"},
-              2: {"Brazil":"+800", "Germany":"+1400", "Netherlands":"+2000", "Portugal":"+1000"},
-              1: {"Argentina":"+800", "England":"+650", "France":"+450", "Spain":"+500"},
-            };
+            // TIER_ODDS imported from tiers.js
             const color = GOLD;
             return (
               <div key={tierNum} style={{marginBottom:12}}>
