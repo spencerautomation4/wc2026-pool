@@ -383,15 +383,15 @@ export default function App() {
         .team-row-expand{animation:slideIn .2s ease forwards;}
       `}</style>
 
-      <div style={{background:"#E8002D",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,flexWrap:"wrap",gap:4}}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,color:"#fff",fontWeight:700,letterSpacing:".06em"}}>FIFA WORLD CUP 2026</span>
-          <span style={{background:"rgba(255,255,255,.2)",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:4,letterSpacing:".1em"}}>POOL TRACKER</span>
+      <div style={{background:"#E8002D",padding:"10px 16px",display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,color:"#fff",fontWeight:700,letterSpacing:".06em",whiteSpace:"nowrap"}}>FIFA WORLD CUP 2026</span>
+          <span style={{background:"rgba(255,255,255,.2)",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:4,letterSpacing:".1em",whiteSpace:"nowrap"}}>POOL TRACKER</span>
         </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:6,flexWrap:"nowrap",overflowX:"auto",paddingBottom:2}}>
           {tabs.map(t=>(
             <button key={t} className={`tab-btn ${tab===t?"tab-active":"tab-inactive"}`}
-              style={tab===t?{background:"#fff",color:"#E8002D"}:{}}
+              style={{...( tab===t?{background:"#fff",color:"#E8002D"}:{} ), flexShrink:0, padding:"7px 14px", fontSize:12}}
               onClick={()=>setTab(t)}>
               {t==="groups"?"GROUP STAGE":t==="bracket"?"BRACKET":t==="draft"?"DRAFT":"LEADERBOARD"}
             </button>
@@ -909,97 +909,72 @@ function LeaderboardTab({draftState, allSt, thirds, top8groups, gScores}) {
   }, [draftState, allSt, thirds, top8groups, gScores]);
 
   const maxTotal = scores[0]?.total || 1;
-
   const toggle = (owner) => setExpanded(e=>({...e, [owner]:!e[owner]}));
-
   const RANK_MEDALS = ["🥇","🥈","🥉","4"];
 
   return(
-    <div style={{padding:"20px 24px",maxWidth:820}}>
-      {/* Header note */}
-      <div style={{fontSize:12,color:"#8896A4",marginBottom:16,display:"flex",alignItems:"center",gap:6}}>
+    <div style={{padding:"14px 12px",maxWidth:820}}>
+      <div style={{fontSize:12,color:"#8896A4",marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
         <span style={{width:8,height:8,borderRadius:"50%",background:"#2F855A",display:"inline-block",flexShrink:0}}/>
         Live — updates in real time as group stage scores are entered
       </div>
 
-      {/* Leaderboard rows */}
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {scores.map(({owner, oi, teamScores, total},rank)=>{
           const color = OWNER_COLORS[oi];
           const isOpen = expanded[owner];
-          // bar width relative to leader
           const barPct = maxTotal > 0 ? Math.round((total/maxTotal)*100) : 0;
           return(
-            <div key={owner} className="card" style={{overflow:"visible"}}>
-              {/* Main row — clickable */}
+            <div key={owner} className="card">
+              {/* Main row */}
               <div className="lb-row" onClick={()=>toggle(owner)}
-                style={{padding:"14px 20px",display:"flex",alignItems:"center",gap:14}}>
-                {/* Rank */}
-                <div style={{width:28,textAlign:"center",fontSize:rank<3?20:15,flexShrink:0}}>
-                  {rank<3?RANK_MEDALS[rank]:<span style={{fontWeight:700,color:"#8896A4",fontFamily:"'Barlow Condensed',sans-serif",fontSize:18}}>{rank+1}</span>}
+                style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:26,textAlign:"center",fontSize:rank<3?18:14,flexShrink:0}}>
+                  {rank<3?RANK_MEDALS[rank]:<span style={{fontWeight:700,color:"#8896A4",fontFamily:"'Barlow Condensed',sans-serif",fontSize:17}}>{rank+1}</span>}
                 </div>
-                {/* Color dot + name */}
-                <div style={{display:"flex",alignItems:"center",gap:8,flex:"0 0 120px"}}>
-                  <div style={{width:12,height:12,borderRadius:"50%",background:color,flexShrink:0}}/>
-                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color,letterSpacing:".05em"}}>{owner.toUpperCase()}</span>
+                <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0,flex:"0 0 auto"}}>
+                  <div style={{width:10,height:10,borderRadius:"50%",background:color,flexShrink:0}}/>
+                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:19,fontWeight:700,color,letterSpacing:".04em",whiteSpace:"nowrap"}}>{owner.toUpperCase()}</span>
                 </div>
-                {/* Bar */}
-                <div style={{flex:1,height:8,background:"#F0F2F5",borderRadius:4,overflow:"hidden"}}>
+                <div style={{flex:1,height:7,background:"#F0F2F5",borderRadius:4,overflow:"hidden",minWidth:20}}>
                   <div style={{width:`${barPct}%`,height:"100%",background:color,borderRadius:4,transition:"width .4s ease"}}/>
                 </div>
-                {/* Total */}
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:700,color:"#1A1A2E",minWidth:44,textAlign:"right"}}>{total}</div>
-                <div style={{fontSize:11,color:"#8896A4",minWidth:30}}>pts</div>
-                {/* Expand chevron */}
-                <div style={{fontSize:14,color:"#8896A4",transition:"transform .2s",transform:isOpen?"rotate(180deg)":"rotate(0deg)"}}>▾</div>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:"#1A1A2E",flexShrink:0}}>{total}</div>
+                <div style={{fontSize:11,color:"#8896A4",flexShrink:0}}>pts</div>
+                <div style={{fontSize:13,color:"#8896A4",transition:"transform .2s",transform:isOpen?"rotate(180deg)":"rotate(0deg)",flexShrink:0}}>▾</div>
               </div>
 
-              {/* Expanded team breakdown */}
+              {/* Expanded breakdown — mobile-optimised: 2 rows per team */}
               {isOpen && (
-                <div style={{borderTop:"1.5px solid #F0F2F5",padding:"0 20px 14px"}}>
-                  {/* Column headers */}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 60px 60px 60px 60px 70px",gap:4,padding:"8px 0 4px",fontSize:10,fontWeight:600,color:"#8896A4",letterSpacing:".06em",textTransform:"uppercase",borderBottom:"1px solid #F0F2F5",marginBottom:4}}>
+                <div style={{borderTop:"1.5px solid #F0F2F5",padding:"4px 14px 12px"}}>
+                  {/* Header row */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 42px 42px 42px 52px",gap:4,padding:"7px 0 4px",fontSize:10,fontWeight:600,color:"#8896A4",letterSpacing:".05em",textTransform:"uppercase",borderBottom:"1px solid #F0F2F5",marginBottom:2}}>
                     <div>Team</div>
                     <div style={{textAlign:"center"}}>Goals</div>
-                    <div style={{textAlign:"center"}}>Grp Pts</div>
-                    <div style={{textAlign:"center"}}>Position</div>
-                    <div style={{textAlign:"center"}}>Base</div>
-                    <div style={{textAlign:"right"}}>Pool Pts</div>
+                    <div style={{textAlign:"center"}}>G.Pts</div>
+                    <div style={{textAlign:"center"}}>Pos</div>
+                    <div style={{textAlign:"right"}}>Pts</div>
                   </div>
                   {[...teamScores].sort((a,b)=>b.finalTotal-a.finalTotal).map(({team, tier, isDouble, score, finalTotal})=>(
-                    <div key={team} className="team-row-expand"
-                      style={{display:"grid",gridTemplateColumns:"1fr 60px 60px 60px 60px 70px",gap:4,padding:"5px 0",borderBottom:"1px solid #F7F8FA",alignItems:"center"}}>
-                      {/* Team name + double badge */}
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <span style={{fontSize:13,fontWeight:500,color:"#1A1A2E"}}>{team}</span>
-                        {isDouble && (
-                          <span style={{fontSize:10,fontWeight:700,background:"#FFFBEB",color:"#92400E",border:"1px solid #FDE68A",borderRadius:4,padding:"1px 5px",letterSpacing:".04em",flexShrink:0}}>×2</span>
-                        )}
-                        <span style={{fontSize:10,color:"#CBD5E0",flexShrink:0}}>T{tier}</span>
+                    <div key={team} style={{display:"grid",gridTemplateColumns:"1fr 42px 42px 42px 52px",gap:4,padding:"5px 0",borderBottom:"1px solid #F7F8FA",alignItems:"center"}}>
+                      {/* Team name */}
+                      <div style={{display:"flex",alignItems:"center",gap:4,minWidth:0}}>
+                        <span style={{fontSize:12,fontWeight:500,color:"#1A1A2E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team}</span>
+                        {isDouble && <span style={{fontSize:9,fontWeight:700,background:"#FFFBEB",color:"#92400E",border:"1px solid #FDE68A",borderRadius:3,padding:"1px 4px",flexShrink:0}}>×2</span>}
                       </div>
-                      {/* Goals */}
-                      <div style={{textAlign:"center",fontSize:13,color:"#4A5568"}}>{score.breakdown.goals}</div>
-                      {/* Group pts */}
-                      <div style={{textAlign:"center",fontSize:13,color:"#4A5568"}}>{score.breakdown.groupPts}</div>
-                      {/* Position bonus */}
+                      <div style={{textAlign:"center",fontSize:12,color:"#4A5568"}}>{score.breakdown.goals}</div>
+                      <div style={{textAlign:"center",fontSize:12,color:"#4A5568"}}>{score.breakdown.groupPts}</div>
                       <div style={{textAlign:"center",fontSize:12,color:score.breakdown.position>0?"#2F855A":"#CBD5E0"}}>
-                        {score.breakdown.position>0
-                          ? <span title={score.breakdown.positionLabel} style={{cursor:"default"}}>+{score.breakdown.position}</span>
-                          : "—"}
+                        {score.breakdown.position>0?`+${score.breakdown.position}`:"—"}
                       </div>
-                      {/* Base total */}
-                      <div style={{textAlign:"center",fontSize:13,color:"#4A5568"}}>{score.total}</div>
-                      {/* Final pool pts */}
-                      <div style={{textAlign:"right",fontSize:14,fontWeight:700,color:isDouble?"#B45309":finalTotal>0?"#1A1A2E":"#CBD5E0"}}>
-                        {finalTotal}
-                        {isDouble && score.total > 0 && <span style={{fontSize:10,color:"#B45309",marginLeft:2}}>×2</span>}
+                      <div style={{textAlign:"right",fontSize:13,fontWeight:700,color:isDouble?"#B45309":finalTotal>0?"#1A1A2E":"#CBD5E0"}}>
+                        {finalTotal}{isDouble&&score.total>0&&<span style={{fontSize:9,color:"#B45309",marginLeft:1}}>×2</span>}
                       </div>
                     </div>
                   ))}
-                  {/* Owner subtotal */}
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:8,marginTop:4,borderTop:"1.5px solid #E2E8F0"}}>
-                    <span style={{fontSize:12,color:"#8896A4"}}>{teamScores.filter(t=>t.isDouble).length} double-point teams</span>
-                    <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color}}>{total} pts total</span>
+                    <span style={{fontSize:11,color:"#8896A4"}}>{teamScores.filter(t=>t.isDouble).length} ×2 teams</span>
+                    <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color}}>{total} pts total</span>
                   </div>
                 </div>
               )}
