@@ -223,6 +223,41 @@ function resolveTeam(slot,allSt,thirdAlloc){if(!slot)return null;if(slot.t==="W"
 function getMatchWinner(res,teamA,teamB){if(!res||res.ha===""||res.ha==null)return null;const ha=parseInt(res.ha),hb=parseInt(res.hb);if(isNaN(ha)||isNaN(hb))return null;if(ha>hb)return teamA;if(hb>ha)return teamB;if(res.pen==="A")return teamA;if(res.pen==="B")return teamB;return null;}
 
 // ─── APP ─────────────────────────────────────────────────────────────────────
+const DRAFT_INIT = {assignments:{},tierIdx:0,phase:"idle",leaderboardPublished:false};
+
+// Error boundary so a broken tab never crashes the whole app
+class TabBoundary extends React.Component {
+  constructor(p){ super(p); this.state={error:null}; }
+  static getDerivedStateFromError(e){ return {error:e}; }
+  render(){
+    if(this.state.error){
+      return(
+        <div style={{padding:40,textAlign:"center"}}>
+          <div style={{fontSize:20,marginBottom:12}}>⚠️</div>
+          <div style={{fontWeight:600,color:"#1A1A2E",marginBottom:8}}>Something went wrong on this tab</div>
+          <div style={{fontSize:13,color:"#8896A4",marginBottom:20}}>{String(this.state.error)}</div>
+          <button onClick={()=>this.setState({error:null})}
+            style={{padding:"8px 20px",background:"#E8002D",color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontSize:13}}>
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Sanitize data coming from Firebase — null fields, missing keys, wrong types
+function sanitizeDraft(d) {
+  if(!d || typeof d !== "object") return null;
+  return {
+    assignments: (d.assignments && typeof d.assignments === "object") ? d.assignments : {},
+    tierIdx: typeof d.tierIdx === "number" ? d.tierIdx : 0,
+    phase: typeof d.phase === "string" ? d.phase : "idle",
+    leaderboardPublished: !!d.leaderboardPublished,
+  };
+}
+
 export default function App() {
   const [tab, setTab] = useState("groups");
   const [gScores, setGScores] = useState({});
@@ -272,8 +307,6 @@ export default function App() {
   },[gScores, kRes, loaded]);
 
   // ── Draft state: subscribe to Firebase real-time updates ─────────────────
-  const DRAFT_INIT = {assignments:{},tierIdx:0,phase:"idle",leaderboardPublished:false};
-
   useEffect(()=>{ draftPhaseRef.current = draftState?.phase ?? "idle"; },[draftState]);
 
   useEffect(()=>{
@@ -283,8 +316,7 @@ export default function App() {
       const phase = draftPhaseRef.current;
       if(phase === "shuffling" || phase === "revealing") return;
       const d = snap.val();
-      if(d){ setDraftState(d); }
-      else { setDraftState(prev => prev ?? DRAFT_INIT); }
+      setDraftState(prev => sanitizeDraft(d) ?? prev ?? DRAFT_INIT);
     });
     return ()=>unsub();
   },[]);
@@ -367,10 +399,12 @@ export default function App() {
         </div>
       </div>
 
-      {tab==="groups" && <GroupsTab allSt={allSt} gScores={gScores} setGroupScore={setGroupScore} thirds={thirds}/>}
-      {tab==="bracket" && <BracketTab bracketTeams={bracketTeams} kRes={kRes} setKnockout={setKnockout}/>}
-      {tab==="draft" && <DraftTab draftState={draftState} setDraftState={setDraftState} saveDraft={saveDraft} setTab={setTab}/>}
-      {tab==="leaderboard" && <LeaderboardTab draftState={draftState} allSt={allSt} thirds={thirds} top8groups={top8groups} gScores={gScores}/>}
+      <TabBoundary key={tab}>
+        {tab==="groups" && <GroupsTab allSt={allSt} gScores={gScores} setGroupScore={setGroupScore} thirds={thirds}/>}
+        {tab==="bracket" && <BracketTab bracketTeams={bracketTeams} kRes={kRes} setKnockout={setKnockout}/>}
+        {tab==="draft" && <DraftTab draftState={draftState} setDraftState={setDraftState} saveDraft={saveDraft} setTab={setTab}/>}
+        {tab==="leaderboard" && <LeaderboardTab draftState={draftState} allSt={allSt} thirds={thirds} top8groups={top8groups} gScores={gScores}/>}
+      </TabBoundary>
     </div>
   );
 }
@@ -563,9 +597,8 @@ function DraftTab({draftState, setDraftState, saveDraft, setTab}) {
     clearInterval(revealTimerRef.current);
   }, []);
 
-  // Fallback — should never stay null due to init logic in App, but guard just in case
-  const DRAFT_INIT = {assignments:{},tierIdx:0,phase:"idle",leaderboardPublished:false};
-  const ds_safe = draftState ?? DRAFT_INIT;
+  // Fallback — uses module-level DRAFT_INIT so draft page always renders something
+  const ds_safe = sanitizeDraft(draftState) ?? DRAFT_INIT;
 
   const ds = ds_safe;
   const tNum = DRAFT_ORDER[ds.tierIdx];
@@ -670,11 +703,10 @@ function DraftTab({draftState, setDraftState, saveDraft, setTab}) {
     clearInterval(revealTimerRef.current);
     pendingRef.current = [];
     revealedRef.current = 0;
-    const n = {assignments:{},tierIdx:0,phase:"idle",leaderboardPublished:false};
-    setDraftState(n);
+    setDraftState(DRAFT_INIT);
     setRevealedCount(0);
     setShuffleTeams([]);
-    saveDraft(n);
+    saveDraft(DRAFT_INIT);
   }
 
   function publishLeaderboard(){
