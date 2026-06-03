@@ -1222,36 +1222,52 @@ function RecapTab({draftState, recapState, saveRecap}) {
 
     const rosterSummary = buildRosterSummary();
 
-    const prompt = `You are a witty sports announcer recapping a FIFA World Cup 2026 pool draft. IMPORTANT: teams were assigned randomly — nobody chose their teams, so never mention strategy, smart picks, or savvy drafting. Just react to the luck of the draw.
+    const prompt = `You are a witty sports analyst recapping a FIFA World Cup 2026 pool draft. Teams were randomly assigned — never mention strategy or smart picks.
 
-Pool rules: Tier 1 = tournament favorites, Tier 12 = longest shots. Tiers 9-12 earn DOUBLE points.
+HOW THE POOL SCORING WORKS (use this to give specific, sharp analysis):
+- 1 point per goal a team scores in the group stage
+- 1 point per group stage point earned (win = 3pts, draw = 1pt, loss = 0)
+- Bonus: +3 pts if the team wins their group, +2 pts for finishing 2nd, +1 pt for advancing as a best 3rd place
+- Teams in Tiers 9-12 earn DOUBLE all of the above points
+- Knockout round scoring is tracked separately — group stage is where you build your base
+- A dominant group stage team (e.g. wins all 3 games 3-0) could earn: 9 goals + 9 pts + 3 bonus = 21 points
+- A weak team that draws all 3 and scores once earns: 1 goal + 3 pts + 0 bonus = 4 points
+- Double-point teams multiply everything — a Tier 9-12 team winning their group 3-0 three times would earn 42 pts
 
-Draft results:
+WHAT MAKES A ROSTER GOOD OR BAD IN THIS POOL:
+- High-scoring favorites (Brazil, France, Spain) rack up goals and group stage points fast
+- Group winners get a +3 bonus — so a team in a weak group is more valuable than the same team in a murderers row
+- Double-point teams (Tiers 9-12) are lottery tickets — a 250k-to-1 team that flukes 2 wins is suddenly worth a ton
+- Bad rosters have strong teams in brutal groups (lots of group stage points but fewer goals, no group win bonus)
+- An owner with 4 teams in the same group is getting hurt when those teams cancel each other out
+- Tiers 5-8 are the unsung heroes — competitive enough to score goals and earn points but not so dominant they draw easy opponents
+
+Draft results (team name, group, tier, odds, double-point flag):
 ${rosterSummary}
 
-Write the recap using EXACTLY this format — no deviations, no extra headers:
+Write the recap using EXACTLY this format:
 
-[One punchy opening sentence about the chaos of the random draw.]
+[One punchy opening sentence.]
 
 OWNER: Scott
-[2-3 sentences. Mention their best team and funniest/worst team by name. Funny, specific, warm roasting.]
+[2-3 sentences grounded in the pool scoring context. How will their roster actually score points? Which teams are group stage goldmines? Which are dead weight? Name specific teams and be specific about why they help or hurt in THIS scoring system. Keep it funny.]
 
 OWNER: Spencer
-[Same format — 2-3 sentences]
+[Same — pool-scoring-focused, funny, specific]
 
 OWNER: Grant
-[Same format — 2-3 sentences]
+[Same]
 
 OWNER: Andrew
-[Same format — 2-3 sentences]
+[Same]
 
 POWER RANKINGS
-1st: [Name] — [one clever line, max 12 words]
+1st: [Name] — [one clever line referencing their pool scoring outlook, max 12 words]
 2nd: [Name] — [one clever line, max 12 words]
 3rd: [Name] — [one clever line, max 12 words]
 4th: [Name] — [one clever line, max 12 words]
 
-STRICT RULES: No markdown (#, **, *, -). No bullet points. No extra sections. Each owner block MUST have 2-3 sentences of actual commentary — never leave it blank. Use specific team names. Be funny.`;
+STRICT RULES: No markdown (#, **, *, -). No bullet points. No extra sections. Must reference specific teams. Be funny but analytical.`;
 
     try {
       const res = await fetch("/api/recap", {
