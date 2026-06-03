@@ -1034,7 +1034,7 @@ function DraftTab({draftState, setDraftState, saveDraft, setTab}) {
       <div className="card" style={{marginTop:24}}>
         <div style={{padding:"10px 16px",borderBottom:"1.5px solid #E2E8F0",display:"flex",alignItems:"center",gap:10}}>
           <div style={{background:"#1A1A2E",color:"#fff",fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15,letterSpacing:".06em",padding:"2px 10px",borderRadius:5}}>ALL TEAMS · TIERS & ODDS</div>
-          <span style={{fontSize:11,color:"#8896A4"}}>BetMGM · April 29, 2026</span>
+          <span style={{fontSize:11,color:"#8896A4"}}>DraftKings · June 3, 2026</span>
         </div>
         <div style={{padding:"12px 16px"}}>
           {DRAFT_ORDER.map(tierNum => {
