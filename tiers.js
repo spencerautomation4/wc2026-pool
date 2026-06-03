@@ -155,6 +155,63 @@ function buildTeamOwnerMap(assignments) {
   return map;
 }
 
+// ─── TEAM → GROUP LOOKUP ──────────────────────────────────────────────────────
+const TEAM_TO_GROUP = Object.fromEntries(
+  Object.entries(GROUPS).flatMap(([g, teams]) => teams.map(t => [t, g]))
+);
+
+// Build owner → {groupLetter: count} map from current assignments
+function buildOwnerGroupCounts(assignments) {
+  const counts = {};
+  OWNERS.forEach(o => { counts[o] = {}; });
+  OWNERS.forEach(o => {
+    (assignments[o] || []).forEach(({team}) => {
+      const g = TEAM_TO_GROUP[team];
+      if (g) counts[o][g] = (counts[o][g] || 0) + 1;
+    });
+  });
+  return counts;
+}
+
+// Enumerate all 24 permutations of assigning 4 teams to 4 owners.
+// Returns a random valid assignment (≤ MAX_PER_GROUP teams per group per owner).
+// Falls back to the minimum-conflict permutation if no valid one exists.
+const MAX_GROUP = 2;
+function constrainedAssign(tierTeams, ownerGroupCounts) {
+  const teamGroups = tierTeams.map(t => TEAM_TO_GROUP[t] || "?");
+  // Generate all permutations of indices [0,1,2,3]
+  const perms = [];
+  const indices = [0,1,2,3];
+  function permute(arr, cur=[]) {
+    if (cur.length === arr.length) { perms.push([...cur]); return; }
+    for (const v of arr) { if (!cur.includes(v)) permute(arr, [...cur, v]); }
+  }
+  permute(indices);
+
+  let valid = [];
+  let bestScore = Infinity;
+  let bestPerm = null;
+
+  for (const perm of perms) {
+    let conflicts = 0;
+    for (let i = 0; i < OWNERS.length; i++) {
+      const owner = OWNERS[i];
+      const grp = teamGroups[perm[i]];
+      const count = ownerGroupCounts[owner][grp] || 0;
+      if (count >= MAX_GROUP) conflicts++;
+    }
+    if (conflicts === 0) valid.push(perm);
+    if (conflicts < bestScore) { bestScore = conflicts; bestPerm = perm; }
+  }
+
+  const chosen = valid.length > 0
+    ? valid[Math.floor(Math.random() * valid.length)]
+    : bestPerm;
+  const hadConflict = valid.length === 0;
+  const result = OWNERS.map((o, i) => ({ owner: o, team: tierTeams[chosen[i]] }));
+  return { result, hadConflict };
+}
+
 // ─── SCORING ENGINE ──────────────────────────────────────────────────────────
 // Returns {total, base, multiplier, breakdown:{goals,groupPts,position,positionLabel}}
 function computeTeamScore(teamName, allSt, thirds, top8groups, gScores) {
@@ -703,9 +760,11 @@ function DraftTab({draftState, setDraftState, saveDraft, setTab}) {
         const delay = tick <= totalFast ? 80 : 200;
         shuffleTimerRef.current = setTimeout(doTick, delay);
       } else {
-        // Shuffle done — build the assignment result
+        // Shuffle done — build constrained assignment
         const shuffled = [...tierTeams].sort(()=>Math.random()-.5);
-        const result = OWNERS.map((o,i)=>({owner:o, team:shuffled[i]}));
+        const ownerGroupCounts = buildOwnerGroupCounts(draftStateRef.current.assignments || {});
+        const { result, hadConflict } = constrainedAssign(shuffled, ownerGroupCounts);
+        if (hadConflict) console.warn("Tier draw: no fully valid assignment found, using minimum-conflict fallback");
 
         // Store in ref immediately so confirmAndAdvance always sees it
         pendingRef.current = result;
@@ -793,7 +852,7 @@ function DraftTab({draftState, setDraftState, saveDraft, setTab}) {
   }
 
   const progressDots = DRAFT_ORDER.map((t,i)=>{
-    const done = i < ds.tierIdx || isDone;
+    const done = i < ds.tierIdx || isDone;   // tiers already drawn
     const active = i === ds.tierIdx && !isDone;
     return(
       <div key={t} style={{width:26,height:26,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,
@@ -822,14 +881,46 @@ function DraftTab({draftState, setDraftState, saveDraft, setTab}) {
               <div style={{padding:"8px 10px",minHeight:60}}>
                 {ownerTeams.length===0
                   ? <span style={{fontSize:11,color:"#CBD5E0",fontStyle:"italic"}}>No teams yet</span>
-                  : ownerTeams.map(({team,tier})=>(
+                  : ownerTeams.map(({team,tier})=>{
+                    const grp = TEAM_TO_GROUP[team];
+                    return(
                     <div key={team} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 5px",marginBottom:2,borderRadius:5,background:"#F7F8FA",border:"1px solid #E2E8F0",minWidth:0}}>
                       <span style={{fontSize:11,fontWeight:500,color:"#1A1A2E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0}}>{team}</span>
-                      <span style={{fontSize:9,color:"#8896A4",marginLeft:4,flexShrink:0}}>T{tier}</span>
+                      <span style={{fontSize:9,color:"#8896A4",marginLeft:4,flexShrink:0}}>{grp}</span>
+                      <span style={{fontSize:9,color:"#CBD5E0",marginLeft:3,flexShrink:0}}>T{tier}</span>
                     </div>
-                  ))
+                  )})
                 }
               </div>
+              {/* Group balance mini-bar */}
+              {ownerTeams.length>0 && (()=>{
+                const groupCounts = {};
+                ownerTeams.forEach(({team})=>{const g=TEAM_TO_GROUP[team];if(g)groupCounts[g]=(groupCounts[g]||0)+1;});
+                const atMax = Object.entries(groupCounts).filter(([,c])=>c>=MAX_GROUP);
+                return(
+                  <div style={{padding:"4px 10px 8px",borderTop:"1px solid #F0F2F5"}}>
+                    <div style={{fontSize:9,color:"#8896A4",marginBottom:3,letterSpacing:".04em",textTransform:"uppercase",fontWeight:600}}>Group coverage</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                      {"ABCDEFGHIJKL".split("").map(g=>{
+                        const cnt = groupCounts[g]||0;
+                        const isMax = cnt>=MAX_GROUP;
+                        const hasSome = cnt===1;
+                        return(
+                          <div key={g} title={`Group ${g}: ${cnt} team${cnt!==1?"s":""}`}
+                            style={{width:16,height:16,borderRadius:3,display:"flex",alignItems:"center",justifyContent:"center",
+                              fontSize:8,fontWeight:700,
+                              background:isMax?"#E8002D":hasSome?"#FEF3C7":"#F0F2F5",
+                              color:isMax?"#fff":hasSome?"#92400E":"#CBD5E0",
+                              border:`1px solid ${isMax?"#E8002D":hasSome?"#FDE68A":"#E2E8F0"}`}}>
+                            {g}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {atMax.length>0&&<div style={{fontSize:9,color:"#E8002D",marginTop:3,fontWeight:500}}>Group{atMax.length>1?"s":""} {atMax.map(([g])=>g).join(",")} full (max {MAX_GROUP})</div>}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
