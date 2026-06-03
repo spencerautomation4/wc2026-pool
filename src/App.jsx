@@ -179,37 +179,67 @@ function buildOwnerGroupCounts(assignments) {
 const MAX_GROUP = 2;
 function constrainedAssign(tierTeams, ownerGroupCounts) {
   const teamGroups = tierTeams.map(t => TEAM_TO_GROUP[t] || "?");
-  // Generate all permutations of indices [0,1,2,3]
+
+  // Generate all 24 permutations of indices [0,1,2,3]
   const perms = [];
-  const indices = [0,1,2,3];
   function permute(arr, cur=[]) {
     if (cur.length === arr.length) { perms.push([...cur]); return; }
     for (const v of arr) { if (!cur.includes(v)) permute(arr, [...cur, v]); }
   }
-  permute(indices);
+  permute([0,1,2,3]);
 
   let valid = [];
-  let bestScore = Infinity;
-  let bestPerm = null;
+  let bestConflictScore = Infinity;
+  let bestConflictPerm = null;
 
   for (const perm of perms) {
     let conflicts = 0;
     for (let i = 0; i < OWNERS.length; i++) {
       const owner = OWNERS[i];
       const grp = teamGroups[perm[i]];
-      const count = ownerGroupCounts[owner][grp] || 0;
-      if (count >= MAX_GROUP) conflicts++;
+      if ((ownerGroupCounts[owner][grp] || 0) >= MAX_GROUP) conflicts++;
     }
     if (conflicts === 0) valid.push(perm);
-    if (conflicts < bestScore) { bestScore = conflicts; bestPerm = perm; }
+    if (conflicts < bestConflictScore) { bestConflictScore = conflicts; bestConflictPerm = perm; }
   }
 
-  const chosen = valid.length > 0
-    ? valid[Math.floor(Math.random() * valid.length)]
-    : bestPerm;
-  const hadConflict = valid.length === 0;
+  // If no valid permutations, use minimum-conflict fallback (uniform random)
+  if (valid.length === 0) {
+    const result = OWNERS.map((o, i) => ({ owner: o, team: tierTeams[bestConflictPerm[i]] }));
+    return { result, hadConflict: true };
+  }
+
+  // Score each valid permutation by how many owners receive a brand-new group.
+  // Higher score = more group diversity introduced this round.
+  const scored = valid.map(perm => {
+    let newGroups = 0;
+    for (let i = 0; i < OWNERS.length; i++) {
+      const owner = OWNERS[i];
+      const grp = teamGroups[perm[i]];
+      if ((ownerGroupCounts[owner][grp] || 0) === 0) newGroups++;
+    }
+    return { perm, newGroups };
+  });
+
+  // Weighted random selection — weight proportional to newGroups score.
+  // If all permutations score 0 (every group already covered), fall back to uniform.
+  const totalWeight = scored.reduce((s, x) => s + x.newGroups, 0);
+  let chosen;
+  if (totalWeight === 0) {
+    // All valid permutations score equally — pick uniformly
+    chosen = valid[Math.floor(Math.random() * valid.length)];
+  } else {
+    // Pick weighted random
+    let r = Math.random() * totalWeight;
+    chosen = scored[scored.length - 1].perm; // fallback to last
+    for (const { perm, newGroups } of scored) {
+      r -= newGroups;
+      if (r <= 0) { chosen = perm; break; }
+    }
+  }
+
   const result = OWNERS.map((o, i) => ({ owner: o, team: tierTeams[chosen[i]] }));
-  return { result, hadConflict };
+  return { result, hadConflict: false };
 }
 
 // ─── SCORING ENGINE ──────────────────────────────────────────────────────────
