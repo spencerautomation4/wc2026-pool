@@ -351,7 +351,6 @@ export default function App() {
   const [kRes, setKRes] = useState({});
   const [loaded, setLoaded] = useState(false);
   const [draftState, setDraftState] = useState(null);
-  const [recapState, setRecapState] = useState(null); // {text, generatedAt} | null
   const focusedRef = useRef(false);
   const localWriteRef = useRef(false); // true while we are writing to Firebase
   const draftPhaseRef = useRef("idle");
@@ -415,20 +414,6 @@ export default function App() {
     draftSavingRef.current = false;
   }
 
-  // Sync recap from Firebase (read-only — only RecapTab writes it)
-  useEffect(()=>{
-    const recapRef = ref(db, "wc26recap");
-    const unsub = onValue(recapRef, (snap)=>{
-      const d = snap.val();
-      if(d) setRecapState(d);
-    });
-    return ()=>unsub();
-  },[]);
-
-  async function saveRecap(r){
-    try{ await set(ref(db,"wc26recap"), r); }catch(e){}
-  }
-
   const allSt=useMemo(()=>{const r={};GROUP_IDS.forEach(g=>r[g]=computeStandings(g,gScores));return r;},[gScores]);
   const thirds=useMemo(()=>rankThirds(allSt),[allSt]);
   const top8groups=useMemo(()=>thirds.slice(0,8).map(t=>t.group).sort(),[thirds]);
@@ -453,7 +438,7 @@ export default function App() {
   const setKnockout=(mid,field,val)=>setKRes(p=>({...p,[mid]:{...(p[mid]||{}),[field]:val}}));
 
   const leaderboardPublished = draftState?.leaderboardPublished && draftState?.phase==="done";
-  const tabs = ["groups","bracket","draft", ...(leaderboardPublished?["leaderboard","recap"]:[])];
+  const tabs = ["groups","bracket","draft", ...(leaderboardPublished?["leaderboard"]:[])];
 
   return (
     <div style={{minHeight:"100vh",background:"#F7F8FA",color:"#1A1A2E",fontFamily:"'DM Sans','Segoe UI',system-ui,sans-serif"}}>
@@ -495,7 +480,7 @@ export default function App() {
             <button key={t} className={`tab-btn ${tab===t?"tab-active":"tab-inactive"}`}
               style={{...( tab===t?{background:"#fff",color:"#E8002D"}:{} ), flexShrink:0, padding:"7px 14px", fontSize:12}}
               onClick={()=>setTab(t)}>
-              {t==="groups"?"GROUP STAGE":t==="bracket"?"BRACKET":t==="draft"?"DRAFT":t==="leaderboard"?"LEADERBOARD":"RECAP 🎙️"}
+              {t==="groups"?"GROUP STAGE":t==="bracket"?"BRACKET":t==="draft"?"DRAFT":"LEADERBOARD"}
             </button>
           ))}
         </div>
@@ -506,7 +491,6 @@ export default function App() {
         {tab==="bracket" && <BracketTab bracketTeams={bracketTeams} kRes={kRes} setKnockout={setKnockout}/>}
         {tab==="draft" && <DraftTab draftState={draftState} setDraftState={setDraftState} saveDraft={saveDraft} setTab={setTab}/>}
         {tab==="leaderboard" && <LeaderboardTab draftState={draftState} allSt={allSt} thirds={thirds} top8groups={top8groups} gScores={gScores}/>}
-        {tab==="recap" && <RecapTab draftState={draftState} recapState={recapState} saveRecap={saveRecap}/>}
       </TabBoundary>
     </div>
   );
@@ -1188,212 +1172,6 @@ function LeaderboardTab({draftState, allSt, thirds, top8groups, gScores}) {
         })}
       </div>
 
-    </div>
-  );
-}
-
-// ─── RECAP TAB ───────────────────────────────────────────────────────────────
-function RecapTab({draftState, recapState, saveRecap}) {
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState(null);
-
-  const canGenerate = draftState?.phase === "done" &&
-    Object.keys(draftState?.assignments || {}).length > 0;
-
-  // Build a compact roster summary to send to the API
-  function buildRosterSummary() {
-    return OWNERS.map((owner, oi) => {
-      const teams = (draftState.assignments[owner] || [])
-        .sort((a,b) => a.tier - b.tier)
-        .map(({team, tier}) => {
-          const grp = TEAM_TO_GROUP[team] || "?";
-          const odds = (TIER_ODDS[tier] || {})[team] || "?";
-          const isDouble = DOUBLE_PT_TIERS.has(tier);
-          return `${team} (Group ${grp}, T${tier}, ${odds}${isDouble?" ×2pts":""})`;
-        });
-      return `${owner}: ${teams.join(", ")}`;
-    }).join("\n");
-  }
-
-  async function generateRecap() {
-    if (!canGenerate) return;
-    setGenerating(true);
-    setError(null);
-
-    const rosterSummary = buildRosterSummary();
-
-    const prompt = `You are a witty, entertaining sports announcer doing a draft recap for a 4-person FIFA World Cup 2026 pool. The pool uses a tiered draft system where Tier 1 = best teams (favorites) and Tier 12 = longest shots. Teams in Tiers 9-12 earn double points.
-
-Here are the draft results:
-${rosterSummary}
-
-Write a draft recap with this exact structure and tone:
-- Concise but entertaining — think ESPN segment, not an essay
-- Genuine humor, light roasting, but keep it friendly
-- For each owner: 2-3 sentences calling out the best and worst of their roster. No formal highlights/lowlights headers — just flow naturally
-- End with a POWER RANKINGS section: rank all 4 owners 1st to 4th, each with just a clever one-line summary (no analysis paragraphs)
-- Use some emoji for flair but don't overdo it
-- Reference specific teams and odds where it adds color
-- Acknowledge the double-points teams (Tiers 9-12) where relevant
-
-Keep the whole thing tight — it should feel like something you'd actually want to read, not a homework assignment.`;
-
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }]
-        })
-      });
-      const data = await res.json();
-      const text = data.content?.filter(b => b.type === "text").map(b => b.text).join("\n") || "";
-      if (!text) throw new Error("Empty response");
-
-      const recap = { text, generatedAt: new Date().toISOString() };
-      setGenerating(false);
-      await saveRecap(recap);
-    } catch(e) {
-      setGenerating(false);
-      setError("Couldn't generate recap — " + e.message);
-    }
-  }
-
-  // Format the recap text — convert markdown-ish formatting to styled elements
-  function formatRecap(text) {
-    return text.split("\n").map((line, i) => {
-      const trimmed = line.trim();
-      if (!trimmed) return <div key={i} style={{height: 10}}/>;
-
-      // Power rankings header
-      if (trimmed.match(/^#+\s*POWER RANK|^POWER RANK/i)) {
-        return (
-          <div key={i} style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,
-            letterSpacing:".08em",color:"#1A1A2E",marginTop:28,marginBottom:8,
-            borderTop:"2px solid #E2E8F0",paddingTop:20}}>
-            🏆 POWER RANKINGS
-          </div>
-        );
-      }
-
-      // Owner name headers (##, **, or ALL CAPS owner name lines)
-      const ownerMatch = trimmed.match(/^(?:#+\s*|🎙️\s*)?(?:\*\*)?([A-Z][a-z]+)(?:'S|'s)?\s*(?:SQUAD|ROSTER|—|-|:|\*\*)/);
-      if (ownerMatch && OWNERS.includes(ownerMatch[1])) {
-        const oi = OWNERS.indexOf(ownerMatch[1]);
-        return (
-          <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginTop:24,marginBottom:6}}>
-            <div style={{width:10,height:10,borderRadius:"50%",background:OWNER_COLORS[oi],flexShrink:0}}/>
-            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,
-              letterSpacing:".06em",color:OWNER_COLORS[oi]}}>
-              {ownerMatch[1].toUpperCase()}
-            </span>
-          </div>
-        );
-      }
-
-      // Power ranking lines: "1st — NAME" or "1. NAME" etc
-      const rankMatch = trimmed.match(/^(🥇|🥈|🥉|1st|2nd|3rd|4th|1\.|2\.|3\.|4\.)\s*[-—]?\s*(\w+)/i);
-      if (rankMatch) {
-        const ownerName = OWNERS.find(o => trimmed.toLowerCase().includes(o.toLowerCase()));
-        const oi = ownerName ? OWNERS.indexOf(ownerName) : -1;
-        return (
-          <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 12px",
-            marginBottom:6,borderRadius:8,background:"#F7F8FA",border:"1.5px solid #E2E8F0"}}>
-            <span style={{fontSize:14,fontWeight:700,color:oi>=0?OWNER_COLORS[oi]:"#4A5568",
-              flexShrink:0,minWidth:36}}>{rankMatch[1]}</span>
-            <span style={{fontSize:13,color:"#1A1A2E",lineHeight:1.5,
-              ...(oi>=0?{fontWeight:500}:{})}}
-              dangerouslySetInnerHTML={{__html: trimmed.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>")}}>
-            </span>
-          </div>
-        );
-      }
-
-      // Regular paragraph
-      return (
-        <p key={i} style={{fontSize:14,lineHeight:1.7,color:"#2D3748",marginBottom:4}}
-          dangerouslySetInnerHTML={{__html: trimmed.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>")}}>
-        </p>
-      );
-    });
-  }
-
-  const generatedDate = recapState?.generatedAt
-    ? new Date(recapState.generatedAt).toLocaleDateString("en-US", {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})
-    : null;
-
-  return (
-    <div style={{padding:"16px 20px",maxWidth:780}}>
-      {/* Header */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-        flexWrap:"wrap",gap:10,marginBottom:16}}>
-        <div>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:700,
-            letterSpacing:".06em",color:"#1A1A2E"}}>🎙️ DRAFT RECAP</div>
-          {generatedDate && (
-            <div style={{fontSize:11,color:"#8896A4",marginTop:2}}>
-              Generated {generatedDate} · AI-powered by Claude
-            </div>
-          )}
-        </div>
-        <button onClick={generateRecap} disabled={generating || !canGenerate}
-          style={{padding:"9px 22px",borderRadius:8,border:"none",
-            background:generating?"#E2E8F0":canGenerate?"#E8002D":"#E2E8F0",
-            color:generating||!canGenerate?"#8896A4":"#fff",
-            fontSize:13,fontWeight:600,cursor:generating||!canGenerate?"not-allowed":"pointer",
-            fontFamily:"inherit",display:"flex",alignItems:"center",gap:8}}>
-          {generating
-            ? <><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⏳</span> Generating…</>
-            : recapState ? "🔄 Regenerate" : "🎙️ Generate Recap"
-          }
-        </button>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div style={{padding:"10px 14px",background:"#FFF5F5",border:"1.5px solid #FED7D7",
-          borderRadius:8,fontSize:13,color:"#C53030",marginBottom:16}}>
-          {error}
-        </div>
-      )}
-
-      {/* Generating skeleton */}
-      {generating && (
-        <div style={{padding:"40px 20px",textAlign:"center",color:"#8896A4"}}>
-          <div style={{fontSize:32,marginBottom:12}}>🎙️</div>
-          <div style={{fontSize:14,fontWeight:500,color:"#4A5568",marginBottom:6}}>
-            Warming up the mic…
-          </div>
-          <div style={{fontSize:12,color:"#8896A4"}}>
-            Analyzing all 48 teams across 4 rosters
-          </div>
-        </div>
-      )}
-
-      {/* Recap content */}
-      {!generating && recapState?.text && (
-        <div style={{background:"#fff",border:"1.5px solid #E2E8F0",borderRadius:12,padding:"24px 28px"}}>
-          {formatRecap(recapState.text)}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!generating && !recapState && (
-        <div style={{padding:"60px 20px",textAlign:"center",color:"#8896A4",
-          background:"#fff",border:"1.5px solid #E2E8F0",borderRadius:12}}>
-          <div style={{fontSize:40,marginBottom:12}}>🎙️</div>
-          <div style={{fontSize:15,fontWeight:600,color:"#1A1A2E",marginBottom:6}}>
-            No recap yet
-          </div>
-          <div style={{fontSize:13}}>
-            Hit Generate Recap to get AI commentary on the draft results
-          </div>
-        </div>
-      )}
-
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
