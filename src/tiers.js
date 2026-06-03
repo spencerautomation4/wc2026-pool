@@ -22,11 +22,11 @@ export const DRAFT_TIERS = {
   12: ["Curaçao","Haiti","South Africa","Uzbekistan"],
 };
 
-// Tiers that earn double points (longest shots)
+// Tiers that earn double points (longest shots — drawn last)
 export const DOUBLE_PT_TIERS = new Set([9, 10, 11, 12]);
 
-// Draft order: start from longest shots, work toward favorites
-export const DRAFT_ORDER = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+// Draft order: start from favorites (Tier 1) and work down to longest shots (Tier 12)
+export const DRAFT_ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 // Odds displayed in the team reference table at the bottom of the Draft page
 // Source: FanDuel via CBS Sports, May 30 2026
