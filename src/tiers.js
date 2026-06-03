@@ -5,23 +5,22 @@
 // Each tier must have exactly 4 teams. Team names must match exactly
 // how they appear in the group definitions in App.jsx.
 //
-// Last updated: June 3, 2026 — FanDuel odds via SI.com
-// Tiers are sorted strictly by odds. Group conflicts within a tier are
-// handled at draw time by the constrained assignment algorithm.
+// Last updated: June 3, 2026 — DraftKings odds (source of truth)
+// Tiers sorted strictly by odds. Group conflicts handled at draw time.
 
 export const DRAFT_TIERS = {
   1:  ["Brazil","England","France","Spain"],
   2:  ["Argentina","Germany","Netherlands","Portugal"],
-  3:  ["Belgium","Colombia","Japan","Norway"],
-  4:  ["Mexico","Morocco","United States","Uruguay"],
-  5:  ["Croatia","Ecuador","Switzerland","Turkey"],
-  6:  ["Austria","Canada","Ivory Coast","Senegal"],
-  7:  ["Egypt","Paraguay","Scotland","Sweden"],
-  8:  ["Bosnia and Herzegovina","Czech Republic","Ghana","South Korea"],
-  9:  ["Algeria","DR Congo","Iran","Tunisia"],
-  10: ["Australia","Cape Verde","Iraq","Jordan"],
-  11: ["New Zealand","Panama","Qatar","Saudi Arabia"],
-  12: ["Curaçao","Haiti","South Africa","Uzbekistan"],
+  3:  ["Belgium","Colombia","Morocco","Norway"],
+  4:  ["Japan","Switzerland","United States","Uruguay"],
+  5:  ["Croatia","Ecuador","Mexico","Turkey"],
+  6:  ["Austria","Scotland","Senegal","Sweden"],
+  7:  ["Canada","Czech Republic","Ivory Coast","Paraguay"],
+  8:  ["Algeria","Egypt","Ghana","South Korea"],
+  9:  ["Australia","Bosnia and Herzegovina","Iran","Tunisia"],
+  10: ["Cape Verde","DR Congo","Panama","Saudi Arabia"],
+  11: ["Iraq","New Zealand","Qatar","South Africa"],
+  12: ["Curaçao","Haiti","Jordan","Uzbekistan"],
 };
 
 // Tiers that earn double points (longest shots — drawn last)
@@ -31,18 +30,18 @@ export const DOUBLE_PT_TIERS = new Set([9, 10, 11, 12]);
 export const DRAFT_ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 // Odds displayed in the team reference table at the bottom of the Draft page
-// Source: FanDuel via SI.com, June 3 2026
+// Source: DraftKings, June 3 2026
 export const TIER_ODDS = {
-  1:  { Brazil: "+850",    England: "+650",   France: "+460",   Spain: "+420"    },
-  2:  { Argentina: "+1000", Germany: "+1300", Netherlands: "+1600", Portugal: "+1000" },
-  3:  { Belgium: "+2200",  Colombia: "+4000", Japan: "+4500",   Norway: "+3500"  },
-  4:  { Mexico: "+6500",   Morocco: "+6000",  "United States": "+6000", Uruguay: "+6000" },
-  5:  { Croatia: "+7000",  Ecuador: "+10000", Switzerland: "+6500", Turkey: "+8000" },
-  6:  { Austria: "+12500", Canada: "+17500",  "Ivory Coast": "+17500", Senegal: "+12500" },
-  7:  { Egypt: "+25000",   Paraguay: "+20000", Scotland: "+30000", Sweden: "+17500" },
-  8:  { "Bosnia and Herzegovina": "+40000", "Czech Republic": "+60000", Ghana: "+60000", "South Korea": "+70000" },
-  9:  { Algeria: "+250000", "DR Congo": "+250000", Iran: "+100000", Tunisia: "+200000" },
-  10: { Australia: "+250000", "Cape Verde": "+250000", Iraq: "+250000", Jordan: "+250000" },
-  11: { "New Zealand": "+250000", Panama: "+250000", Qatar: "+250000", "Saudi Arabia": "+250000" },
-  12: { "Curaçao": "+250000", Haiti: "+250000", "South Africa": "+250000", Uzbekistan: "+250000" },
+  1:  { Brazil: "+850",    England: "+700",   France: "+475",   Spain: "+475"    },
+  2:  { Argentina: "+900", Germany: "+1400",  Netherlands: "+2200", Portugal: "+1000" },
+  3:  { Belgium: "+3500",  Colombia: "+4000", Morocco: "+5000",  Norway: "+3500"  },
+  4:  { Japan: "+6500",    Switzerland: "+6500", "United States": "+6000", Uruguay: "+6500" },
+  5:  { Croatia: "+9000",  Ecuador: "+8000",  Mexico: "+8000",  Turkey: "+9000"  },
+  6:  { Austria: "+15000", Scotland: "+20000", Senegal: "+9000", Sweden: "+12000" },
+  7:  { Canada: "+20000",  "Czech Republic": "+25000", "Ivory Coast": "+25000", Paraguay: "+30000" },
+  8:  { Algeria: "+35000", Egypt: "+30000",   Ghana: "+30000",  "South Korea": "+40000" },
+  9:  { Australia: "+60000", "Bosnia and Herzegovina": "+50000", Iran: "+70000", Tunisia: "+50000" },
+  10: { "Cape Verde": "+100000", "DR Congo": "+100000", Panama: "+100000", "Saudi Arabia": "+100000" },
+  11: { Iraq: "+150000",   "New Zealand": "+150000", Qatar: "+150000", "South Africa": "+100000" },
+  12: { "Curaçao": "+250000", Haiti: "+250000", Jordan: "+250000", Uzbekistan: "+150000" },
 };
