@@ -1222,21 +1222,36 @@ function RecapTab({draftState, recapState, saveRecap}) {
 
     const rosterSummary = buildRosterSummary();
 
-    const prompt = `You are a witty, entertaining sports announcer doing a draft recap for a 4-person FIFA World Cup 2026 pool. The pool uses a tiered draft system where Tier 1 = best teams (favorites) and Tier 12 = longest shots. Teams in Tiers 9-12 earn double points.
+    const prompt = `You are a witty sports announcer recapping a FIFA World Cup 2026 pool draft. IMPORTANT: teams were assigned randomly — nobody chose their teams, so never mention strategy, smart picks, or savvy drafting. Just react to the luck of the draw.
 
-Here are the draft results:
+Pool rules: Tier 1 = tournament favorites, Tier 12 = longest shots. Tiers 9-12 earn DOUBLE points.
+
+Draft results:
 ${rosterSummary}
 
-Write a draft recap with this exact structure and tone:
-- Concise but entertaining — think ESPN segment, not an essay
-- Genuine humor, light roasting, but keep it friendly
-- For each owner: 2-3 sentences calling out the best and worst of their roster. No formal highlights/lowlights headers — just flow naturally
-- End with a POWER RANKINGS section: rank all 4 owners 1st to 4th, each with just a clever one-line summary (no analysis paragraphs)
-- Use some emoji for flair but don't overdo it
-- Reference specific teams and odds where it adds color
-- Acknowledge the double-points teams (Tiers 9-12) where relevant
+Write the recap using EXACTLY this format — no deviations, no extra headers:
 
-Keep the whole thing tight — it should feel like something you'd actually want to read, not a homework assignment.`;
+[One punchy opening sentence about the chaos of the random draw.]
+
+OWNER: Scott
+[2-3 sentences. Mention their best team and funniest/worst team by name. Funny, specific, warm roasting.]
+
+OWNER: Spencer
+[Same format — 2-3 sentences]
+
+OWNER: Grant
+[Same format — 2-3 sentences]
+
+OWNER: Andrew
+[Same format — 2-3 sentences]
+
+POWER RANKINGS
+1st: [Name] — [one clever line, max 12 words]
+2nd: [Name] — [one clever line, max 12 words]
+3rd: [Name] — [one clever line, max 12 words]
+4th: [Name] — [one clever line, max 12 words]
+
+STRICT RULES: No markdown (#, **, *, -). No bullet points. No extra sections. Each owner block MUST have 2-3 sentences of actual commentary — never leave it blank. Use specific team names. Be funny.`;
 
     try {
       const res = await fetch("/api/recap", {
@@ -1261,61 +1276,80 @@ Keep the whole thing tight — it should feel like something you'd actually want
 
   // Format the recap text — convert markdown-ish formatting to styled elements
   function formatRecap(text) {
-    return text.split("\n").map((line, i) => {
-      const trimmed = line.trim();
-      if (!trimmed) return <div key={i} style={{height: 10}}/>;
+    const clean = text.replace(/^#{1,3}\s+/gm, "");
+    const allLines = clean.split("\n");
+    const elements = [];
+    let inRankings = false;
 
-      // Power rankings header
-      if (trimmed.match(/^#+\s*POWER RANK|^POWER RANK/i)) {
-        return (
-          <div key={i} style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,
-            letterSpacing:".08em",color:"#1A1A2E",marginTop:28,marginBottom:8,
-            borderTop:"2px solid #E2E8F0",paddingTop:20}}>
+    allLines.forEach((line, i) => {
+      const t = line.trim();
+      if (!t) { elements.push(<div key={i} style={{height:8}}/>); return; }
+
+      // POWER RANKINGS header
+      if (/^POWER RANKINGS?/i.test(t)) {
+        inRankings = true;
+        elements.push(
+          <div key={i} style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,
+            letterSpacing:".08em",color:"#1A1A2E",marginTop:28,marginBottom:10,
+            paddingTop:20,borderTop:"2px solid #E2E8F0",display:"flex",alignItems:"center",gap:8}}>
             🏆 POWER RANKINGS
           </div>
         );
+        return;
       }
 
-      // Owner name headers (##, **, or ALL CAPS owner name lines)
-      const ownerMatch = trimmed.match(/^(?:#+\s*|🎙️\s*)?(?:\*\*)?([A-Z][a-z]+)(?:'S|'s)?\s*(?:SQUAD|ROSTER|—|-|:|\*\*)/);
-      if (ownerMatch && OWNERS.includes(ownerMatch[1])) {
-        const oi = OWNERS.indexOf(ownerMatch[1]);
-        return (
-          <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginTop:24,marginBottom:6}}>
-            <div style={{width:10,height:10,borderRadius:"50%",background:OWNER_COLORS[oi],flexShrink:0}}/>
-            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,
-              letterSpacing:".06em",color:OWNER_COLORS[oi]}}>
-              {ownerMatch[1].toUpperCase()}
+      // OWNER: Name header
+      const ownerHeader = t.match(/^OWNER:\s*(\w+)/i);
+      if (ownerHeader) {
+        const name = ownerHeader[1];
+        const oi = OWNERS.findIndex(o => o.toLowerCase() === name.toLowerCase());
+        elements.push(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginTop:22,marginBottom:5}}>
+            {oi >= 0 && <div style={{width:10,height:10,borderRadius:"50%",background:OWNER_COLORS[oi],flexShrink:0}}/>}
+            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,
+              letterSpacing:".06em",color:oi >= 0 ? OWNER_COLORS[oi] : "#1A1A2E"}}>
+              {name.toUpperCase()}
             </span>
           </div>
         );
+        return;
       }
 
-      // Power ranking lines: "1st — NAME" or "1. NAME" etc
-      const rankMatch = trimmed.match(/^(🥇|🥈|🥉|1st|2nd|3rd|4th|1\.|2\.|3\.|4\.)\s*[-—]?\s*(\w+)/i);
-      if (rankMatch) {
-        const ownerName = OWNERS.find(o => trimmed.toLowerCase().includes(o.toLowerCase()));
-        const oi = ownerName ? OWNERS.indexOf(ownerName) : -1;
-        return (
-          <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 12px",
-            marginBottom:6,borderRadius:8,background:"#F7F8FA",border:"1.5px solid #E2E8F0"}}>
-            <span style={{fontSize:14,fontWeight:700,color:oi>=0?OWNER_COLORS[oi]:"#4A5568",
-              flexShrink:0,minWidth:36}}>{rankMatch[1]}</span>
-            <span style={{fontSize:13,color:"#1A1A2E",lineHeight:1.5,
-              ...(oi>=0?{fontWeight:500}:{})}}
-              dangerouslySetInnerHTML={{__html: trimmed.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>")}}>
-            </span>
-          </div>
-        );
+      // Power ranking lines inside rankings section: "1st: Name — summary"
+      if (inRankings) {
+        const rankLine = t.match(/^(\d(?:st|nd|rd|th)):\s*(\w+)\s*[—–-]\s*(.+)/i);
+        if (rankLine) {
+          const rankLabel = rankLine[1];
+          const ownerName = rankLine[2];
+          const summary = rankLine[3];
+          const oi = OWNERS.findIndex(o => o.toLowerCase() === ownerName.toLowerCase());
+          const medals = ["🥇","🥈","🥉","4️⃣"];
+          const medalIdx = parseInt(rankLabel.charAt(0)) - 1;
+          elements.push(
+            <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"9px 14px",
+              marginBottom:7,borderRadius:8,background:"#F7F8FA",border:"1.5px solid #E2E8F0"}}>
+              <span style={{fontSize:20,flexShrink:0,lineHeight:1.2}}>
+                {medalIdx >= 0 && medalIdx <= 3 ? medals[medalIdx] : rankLabel}
+              </span>
+              <div>
+                <span style={{fontSize:13,fontWeight:700,color:oi>=0?OWNER_COLORS[oi]:"#1A1A2E"}}>
+                  {ownerName}
+                </span>
+                <span style={{fontSize:13,color:"#4A5568"}}> — {summary}</span>
+              </div>
+            </div>
+          );
+          return;
+        }
       }
 
       // Regular paragraph
-      return (
-        <p key={i} style={{fontSize:14,lineHeight:1.7,color:"#2D3748",marginBottom:4}}
-          dangerouslySetInnerHTML={{__html: trimmed.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>")}}>
-        </p>
+      elements.push(
+        <p key={i} style={{fontSize:14,lineHeight:1.75,color:"#2D3748",marginBottom:2}}>{t}</p>
       );
     });
+
+    return elements;
   }
 
   const generatedDate = recapState?.generatedAt
