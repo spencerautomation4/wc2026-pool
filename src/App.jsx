@@ -1222,58 +1222,29 @@ function RecapTab({draftState, recapState, saveRecap}) {
 
     const rosterSummary = buildRosterSummary();
 
-    const prompt = `You are a witty sports analyst recapping a FIFA World Cup 2026 pool draft. Teams were randomly assigned — never mention strategy or smart picks.
+    const prompt = `You are a witty, entertaining sports announcer doing a draft recap for a 4-person FIFA World Cup 2026 pool. The pool uses a tiered draft system where Tier 1 = best teams (favorites) and Tier 12 = longest shots. Teams in Tiers 9-12 earn double points.
 
-HOW THE POOL SCORING WORKS (use this to give specific, sharp analysis):
-- 1 point per goal a team scores in the group stage
-- 1 point per group stage point earned (win = 3pts, draw = 1pt, loss = 0)
-- Bonus: +3 pts if the team wins their group, +2 pts for finishing 2nd, +1 pt for advancing as a best 3rd place
-- Teams in Tiers 9-12 earn DOUBLE all of the above points
-- Knockout round scoring is tracked separately — group stage is where you build your base
-- A dominant group stage team (e.g. wins all 3 games 3-0) could earn: 9 goals + 9 pts + 3 bonus = 21 points
-- A weak team that draws all 3 and scores once earns: 1 goal + 3 pts + 0 bonus = 4 points
-- Double-point teams multiply everything — a Tier 9-12 team winning their group 3-0 three times would earn 42 pts
-
-WHAT MAKES A ROSTER GOOD OR BAD IN THIS POOL:
-- High-scoring favorites (Brazil, France, Spain) rack up goals and group stage points fast
-- Group winners get a +3 bonus — so a team in a weak group is more valuable than the same team in a murderers row
-- Double-point teams (Tiers 9-12) are lottery tickets — a 250k-to-1 team that flukes 2 wins is suddenly worth a ton
-- Bad rosters have strong teams in brutal groups (lots of group stage points but fewer goals, no group win bonus)
-- An owner with 4 teams in the same group is getting hurt when those teams cancel each other out
-- Tiers 5-8 are the unsung heroes — competitive enough to score goals and earn points but not so dominant they draw easy opponents
-
-Draft results (team name, group, tier, odds, double-point flag):
+Here are the draft results:
 ${rosterSummary}
 
-Write the recap using EXACTLY this format:
+Write a draft recap with this exact structure and tone:
+- Concise but entertaining — think ESPN segment, not an essay
+- Genuine humor, light roasting, but keep it friendly
+- For each owner: 2-3 sentences calling out the best and worst of their roster. No formal highlights/lowlights headers — just flow naturally
+- End with a POWER RANKINGS section: rank all 4 owners 1st to 4th, each with just a clever one-line summary (no analysis paragraphs)
+- Use some emoji for flair but don't overdo it
+- Reference specific teams and odds where it adds color
+- Acknowledge the double-points teams (Tiers 9-12) where relevant
 
-[One punchy opening sentence.]
-
-OWNER: Scott
-[2-3 sentences grounded in the pool scoring context. How will their roster actually score points? Which teams are group stage goldmines? Which are dead weight? Name specific teams and be specific about why they help or hurt in THIS scoring system. Keep it funny.]
-
-OWNER: Spencer
-[Same — pool-scoring-focused, funny, specific]
-
-OWNER: Grant
-[Same]
-
-OWNER: Andrew
-[Same]
-
-POWER RANKINGS
-1st: [Name] — [one clever line referencing their pool scoring outlook, max 12 words]
-2nd: [Name] — [one clever line, max 12 words]
-3rd: [Name] — [one clever line, max 12 words]
-4th: [Name] — [one clever line, max 12 words]
-
-STRICT RULES: No markdown (#, **, *, -). No bullet points. No extra sections. Must reference specific teams. Be funny but analytical.`;
+Keep the whole thing tight — it should feel like something you'd actually want to read, not a homework assignment.`;
 
     try {
-      const res = await fetch("/api/recap", {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
           messages: [{ role: "user", content: prompt }]
         })
       });
@@ -1292,80 +1263,61 @@ STRICT RULES: No markdown (#, **, *, -). No bullet points. No extra sections. Mu
 
   // Format the recap text — convert markdown-ish formatting to styled elements
   function formatRecap(text) {
-    const clean = text.replace(/^#{1,3}\s+/gm, "");
-    const allLines = clean.split("\n");
-    const elements = [];
-    let inRankings = false;
+    return text.split("\n").map((line, i) => {
+      const trimmed = line.trim();
+      if (!trimmed) return <div key={i} style={{height: 10}}/>;
 
-    allLines.forEach((line, i) => {
-      const t = line.trim();
-      if (!t) { elements.push(<div key={i} style={{height:8}}/>); return; }
-
-      // POWER RANKINGS header
-      if (/^POWER RANKINGS?/i.test(t)) {
-        inRankings = true;
-        elements.push(
-          <div key={i} style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,
-            letterSpacing:".08em",color:"#1A1A2E",marginTop:28,marginBottom:10,
-            paddingTop:20,borderTop:"2px solid #E2E8F0",display:"flex",alignItems:"center",gap:8}}>
+      // Power rankings header
+      if (trimmed.match(/^#+\s*POWER RANK|^POWER RANK/i)) {
+        return (
+          <div key={i} style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,
+            letterSpacing:".08em",color:"#1A1A2E",marginTop:28,marginBottom:8,
+            borderTop:"2px solid #E2E8F0",paddingTop:20}}>
             🏆 POWER RANKINGS
           </div>
         );
-        return;
       }
 
-      // OWNER: Name header
-      const ownerHeader = t.match(/^OWNER:\s*(\w+)/i);
-      if (ownerHeader) {
-        const name = ownerHeader[1];
-        const oi = OWNERS.findIndex(o => o.toLowerCase() === name.toLowerCase());
-        elements.push(
-          <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginTop:22,marginBottom:5}}>
-            {oi >= 0 && <div style={{width:10,height:10,borderRadius:"50%",background:OWNER_COLORS[oi],flexShrink:0}}/>}
-            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,
-              letterSpacing:".06em",color:oi >= 0 ? OWNER_COLORS[oi] : "#1A1A2E"}}>
-              {name.toUpperCase()}
+      // Owner name headers (##, **, or ALL CAPS owner name lines)
+      const ownerMatch = trimmed.match(/^(?:#+\s*|🎙️\s*)?(?:\*\*)?([A-Z][a-z]+)(?:'S|'s)?\s*(?:SQUAD|ROSTER|—|-|:|\*\*)/);
+      if (ownerMatch && OWNERS.includes(ownerMatch[1])) {
+        const oi = OWNERS.indexOf(ownerMatch[1]);
+        return (
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginTop:24,marginBottom:6}}>
+            <div style={{width:10,height:10,borderRadius:"50%",background:OWNER_COLORS[oi],flexShrink:0}}/>
+            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,
+              letterSpacing:".06em",color:OWNER_COLORS[oi]}}>
+              {ownerMatch[1].toUpperCase()}
             </span>
           </div>
         );
-        return;
       }
 
-      // Power ranking lines inside rankings section: "1st: Name — summary"
-      if (inRankings) {
-        const rankLine = t.match(/^(\d(?:st|nd|rd|th)):\s*(\w+)\s*[—–-]\s*(.+)/i);
-        if (rankLine) {
-          const rankLabel = rankLine[1];
-          const ownerName = rankLine[2];
-          const summary = rankLine[3];
-          const oi = OWNERS.findIndex(o => o.toLowerCase() === ownerName.toLowerCase());
-          const medals = ["🥇","🥈","🥉","4️⃣"];
-          const medalIdx = parseInt(rankLabel.charAt(0)) - 1;
-          elements.push(
-            <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"9px 14px",
-              marginBottom:7,borderRadius:8,background:"#F7F8FA",border:"1.5px solid #E2E8F0"}}>
-              <span style={{fontSize:20,flexShrink:0,lineHeight:1.2}}>
-                {medalIdx >= 0 && medalIdx <= 3 ? medals[medalIdx] : rankLabel}
-              </span>
-              <div>
-                <span style={{fontSize:13,fontWeight:700,color:oi>=0?OWNER_COLORS[oi]:"#1A1A2E"}}>
-                  {ownerName}
-                </span>
-                <span style={{fontSize:13,color:"#4A5568"}}> — {summary}</span>
-              </div>
-            </div>
-          );
-          return;
-        }
+      // Power ranking lines: "1st — NAME" or "1. NAME" etc
+      const rankMatch = trimmed.match(/^(🥇|🥈|🥉|1st|2nd|3rd|4th|1\.|2\.|3\.|4\.)\s*[-—]?\s*(\w+)/i);
+      if (rankMatch) {
+        const ownerName = OWNERS.find(o => trimmed.toLowerCase().includes(o.toLowerCase()));
+        const oi = ownerName ? OWNERS.indexOf(ownerName) : -1;
+        return (
+          <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 12px",
+            marginBottom:6,borderRadius:8,background:"#F7F8FA",border:"1.5px solid #E2E8F0"}}>
+            <span style={{fontSize:14,fontWeight:700,color:oi>=0?OWNER_COLORS[oi]:"#4A5568",
+              flexShrink:0,minWidth:36}}>{rankMatch[1]}</span>
+            <span style={{fontSize:13,color:"#1A1A2E",lineHeight:1.5,
+              ...(oi>=0?{fontWeight:500}:{})}}
+              dangerouslySetInnerHTML={{__html: trimmed.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>")}}>
+            </span>
+          </div>
+        );
       }
 
       // Regular paragraph
-      elements.push(
-        <p key={i} style={{fontSize:14,lineHeight:1.75,color:"#2D3748",marginBottom:2}}>{t}</p>
+      return (
+        <p key={i} style={{fontSize:14,lineHeight:1.7,color:"#2D3748",marginBottom:4}}
+          dangerouslySetInnerHTML={{__html: trimmed.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>")}}>
+        </p>
       );
     });
-
-    return elements;
   }
 
   const generatedDate = recapState?.generatedAt
